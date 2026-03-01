@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_VISIBLE_DEVICES=0
 ENV PYTORCH_ALLOC_CONF=expandable_segments:True
-ENV MODEL_NAME=crestai/spark-tts-nexvox-v2
+ENV MODEL_NAME=crestai/spark-tts-nexvox-v7
 ENV TOKENIZER_REPO=unsloth/Spark-TTS-0.5B
 ENV TOKENIZER_CACHE_DIR=Spark-TTS-0.5B
 ENV SPARK_TTS_REPO_PATH=Spark-TTS
@@ -55,3 +55,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
 
 # Run the application
 CMD ["python", "spark_tts_streaming.py"]
+
