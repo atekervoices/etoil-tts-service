@@ -44,7 +44,7 @@ AUDIO_CHANNELS = 1
 # Default parameters
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 2048
-DEFAULT_SPEAKER_ID = 243  # Runyankore female
+DEFAULT_SPEAKER_ID = "nyn_female_248"  # Runyankore female
 
 # Speaker IDs mapping
 SPEAKER_IDS = {
@@ -1594,6 +1594,7 @@ if __name__ == "__main__":
         timeout_keep_alive=300
 
     )
+
 
 
 
