@@ -2,13 +2,13 @@ version: '3.8'
 
 services:
   spark-tts:
-    build: .
+    build: 
     container_name: spark-tts-streaming
     ports:
       - "8000:8000"
     environment:
       - CUDA_VISIBLE_DEVICES=0,1
-      - MODEL_NAME=crestai/spark-tts-nexvox-v8
+      - MODEL_NAME=crestai/spark-tts-nexvox-v20
       - TOKENIZER_REPO=unsloth/Spark-TTS-0.5B
       - TOKENIZER_CACHE_DIR=Spark-TTS-0.5B
       - SPARK_TTS_REPO_PATH=Spark-TTS
@@ -22,6 +22,7 @@ services:
       - NCCL_TREE_THRESHOLD=0
       - NCCL_RING_THRESHOLD=8388608
     volumes:
+      - ./src:/app/src
       - ./cache:/app/cache
       - ./Spark-TTS-0.5B:/app/Spark-TTS-0.5B
     shm_size: '2gb'

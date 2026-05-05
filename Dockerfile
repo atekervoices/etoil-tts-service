@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV CUDA_VISIBLE_DEVICES=0
 ENV PYTORCH_ALLOC_CONF=expandable_segments:True
-ENV MODEL_NAME=crestai/spark-tts-nexvox-v8
+ENV MODEL_NAME=crestai/spark-tts-nexvox-v20
 ENV TOKENIZER_REPO=unsloth/Spark-TTS-0.5B
 ENV TOKENIZER_CACHE_DIR=Spark-TTS-0.5B
 ENV SPARK_TTS_REPO_PATH=Spark-TTS
@@ -44,7 +44,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN git clone https://github.com/SparkAudio/Spark-TTS.git
 
 # Copy application code
-COPY spark_tts_streaming.py .
+COPY src/ ./src/
+COPY main.py .
 
 # Expose port
 EXPOSE 8000
@@ -54,6 +55,6 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/ || exit 1
 
 # Run the application
-CMD ["python", "spark_tts_streaming.py"]
+CMD ["python", "main.py"]
 
 

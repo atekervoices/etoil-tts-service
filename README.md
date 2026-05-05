@@ -4,12 +4,35 @@ A high-performance FastAPI server for streaming text-to-speech using the Spark T
 
 ## Features
 
-- **6 Voice Options**: Acholi, Ateso, Runyankore, Lugbara, Swahili, and Luganda
+- **Multi-language Support**: African languages including Acholi, Ateso, Runyankore, Luganda, Swahili, and more
+- **Voice Cloning**: Clone voices from reference audio
 - **Fast Streaming**: Sentence-by-sentence generation for low latency
 - **Dual Protocols**: WebSocket and HTTP streaming endpoints
 - **vLLM Backend**: Efficient inference with GPU acceleration
-- **Multi-language Support**: African languages with native speakers
-- **Easy Integration**: REST API compatible with standard tools
+- **Modular Architecture**: Clean separation of concerns for maintainability
+- **Docker Support**: Easy deployment with Docker and Docker Compose
+
+## Project Structure
+
+```
+nexvoxai_spark-tts-vllm/
+├── src/                      # Modularized source code
+│   ├── __init__.py
+│   ├── config.py            # Configuration constants
+│   ├── speakers.py          # Speaker ID mappings
+│   ├── speaker_tokens.py    # Precomputed global tokens
+│   ├── models.py            # Pydantic models for API requests
+│   ├── text_processing.py   # Text chunking functions
+│   ├── audio_processing.py  # Audio processing functions
+│   ├── model_loader.py      # Model initialization
+│   ├── audio_generation.py  # Audio generation functions
+│   └── api.py               # FastAPI app and endpoints
+├── main.py                  # Application entry point
+├── Dockerfile               # Docker configuration
+├── docker-compose.yml       # Docker Compose configuration
+├── requirements.txt         # Python dependencies
+└── README.md               # This file
+```
 
 ## Quick Start
 
@@ -19,52 +42,69 @@ A high-performance FastAPI server for streaming text-to-speech using the Spark T
 - CUDA-capable GPU (tested on RTX 4090, 24GB VRAM)
 - Hugging Face account with access token
 
-### Installation
+### Local Installation
 
-1. **Clone the repository and dependencies:**
+1. **Clone the repository:**
 
 ```bash
-# Clone Spark-TTS repository
-git clone https://github.com/SparkAudio/Spark-TTS
-cd Spark-TTS
-
-# Install dependencies
-pip install einx einops soundfile librosa vllm omegaconf fastapi uvicorn websockets
+git clone <repository-url>
+cd nexvoxai_spark-tts-vllm
 ```
 
-2. **Set up Hugging Face authentication:**
+2. **Install dependencies:**
 
 ```bash
-# Login to Hugging Face
+pip install -r requirements.txt
+```
+
+3. **Clone Spark-TTS repository:**
+
+```bash
+git clone https://github.com/SparkAudio/Spark-TTS
+```
+
+4. **Set up Hugging Face authentication:**
+
+```bash
 huggingface-cli login
 # Or set token directly
 export HF_TOKEN=your_token_here
 ```
 
-3. **Download the server script:**
-
-Save the `spark_tts_streaming_server.py` file to your project directory.
-
-### Running the Server
+5. **Run the server:**
 
 ```bash
-python spark_tts_streaming_server.py
+python main.py
 ```
 
-The server will start on `http://0.0.0.0:8001`
+The server will start on `http://0.0.0.0:8002`
 
-## API Reference
+## Docker Deployment
 
-### Available Voices
+### Prerequisites
 
-| Voice Name | Speaker ID | Language | Gender |
-|------------|------------|----------|--------|
-| `acholi_female` | 241 | Acholi | Female |
-| `ateso_female` | 242 | Ateso | Female |
-| `runyankore_female` | 243 | Runyankore | Female |
-| `lugbara_female` | 245 | Lugbara | Female |
-| `swahili_male` | 246 | Swahili | Male |
-| `luganda_female` | 248 | Luganda | Female |
+1. **Docker Engine** (20.10+)
+2. **Docker Compose** (2.0+)
+3. **NVIDIA Container Toolkit** (for GPU support)
+4. **NVIDIA GPU** with CUDA support
+
+### Install NVIDIA Container Toolkit
+
+```bash
+# Ubuntu/Debian
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+
+sudo apt-get update && sudo apt-get install -y nvidia-docker2
+sudo systemctl restart docker
+```
+
+### Verify GPU Support
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
+```
 
 ### Using Docker Compose (Recommended)
 
@@ -82,11 +122,49 @@ docker compose logs -f
 docker compose down
 ```
 
+### Using Docker Directly
+
+```bash
+# Build the image
+docker build -t spark-tts-streaming .
+
+# Run the container
+docker run --gpus all -p 8002:8002 --name spark-tts spark-tts-streaming
+
+# Run in detached mode
+docker run -d --gpus all -p 8002:8002 --name spark-tts spark-tts-streaming
+```
+
+## API Reference
+
+### Available Voices
+
+The server supports multiple African language voices. Use the `/v1/voices` endpoint to get the full list.
+
+Available languages include:
+- English (eng)
+- Acholi (ach)
+- Ateso (teo)
+- Runyankore (nyn)
+- Swahili (swa)
+- Luganda (lug)
+- Lusoga (xog)
+- Kinyarwanda (kin)
+- Luo (luo)
+- Kikuyu (kik)
+- Hausa (hau)
+- Igbo (ibo)
+- Twi (twi)
+- Yoruba (yor)
+- Wolof (wol)
+- Nigerian Pidgin (pcm)
+- Fula (fat)
+
 ### Endpoints
 
 #### 1. WebSocket Streaming
 
-**Endpoint:** `ws://localhost:8001/v1/audio/speech/stream/ws`
+**Endpoint:** `ws://localhost:8002/v1/audio/speech/stream/ws`
 
 **Protocol:**
 
@@ -94,8 +172,7 @@ docker compose down
 ```json
 {
   "input": "Your text here",
-  "voice": "luganda_female",
-  "speaker_id": 248,
+  "speaker_id": "lug_female_4",
   "temperature": 0.7,
   "segment_id": "unique_id",
   "continue": true
@@ -105,7 +182,7 @@ docker compose down
 **Server → Client:**
 ```json
 // Start message
-{"type": "start", "segment_id": "unique_id", "speaker_id": 248}
+{"type": "start", "segment_id": "unique_id", "speaker_id": "lug_female_4"}
 
 // Binary audio chunks (PCM16, 16kHz, mono)
 <binary data>
@@ -125,8 +202,7 @@ docker compose down
 ```json
 {
   "text": "Your text here",
-  "voice": "luganda_female",
-  "speaker_id": 248,
+  "speaker_id": "lug_female_4",
   "temperature": 0.7,
   "max_tokens": 2048
 }
@@ -140,24 +216,60 @@ docker compose down
   - `X-Channels: 1`
 - Body: Streaming PCM audio data
 
-#### 3. List Available Voices
+#### 3. Voice Cloning (HTTP)
+
+**Endpoint:** `POST /v1/audio/speech/clone`
+
+**Request Body:**
+```json
+{
+  "text": "Your text here",
+  "reference_audio_path": "/path/to/reference.wav",
+  "reference_text": "Optional reference text",
+  "temperature": 0.7
+}
+```
+
+#### 4. Voice Cloning (Upload)
+
+**Endpoint:** `POST /v1/audio/speech/clone/upload`
+
+**Request:** Multipart form data with:
+- `text`: Text to synthesize
+- `reference_audio`: Audio file (WAV, MP3, M4A, FLAC, OGG)
+- `reference_text`: Optional reference text
+- `temperature`: Temperature (default: 0.7)
+
+#### 5. Voice Cloning (WebSocket)
+
+**Endpoint:** `ws://localhost:8002/v1/audio/speech/clone/ws`
+
+**Protocol:**
+```json
+{
+  "input": "Your text here",
+  "reference_audio_path": "/path/to/reference.wav",
+  "reference_text": "Optional reference text",
+  "temperature": 0.7,
+  "segment_id": "unique_id"
+}
+```
+
+#### 6. List Available Voices
 
 **Endpoint:** `GET /v1/voices`
 
 **Response:**
 ```json
 {
-  "voices": [
-    {
-      "id": "luganda_female",
-      "speaker_id": 248,
-      "language": "luganda"
-    }
+  "speaker_ids": [
+    {"id": "lug_female_4", "language": "lug"},
+    {"id": "swa_male_3", "language": "swa"}
   ]
 }
 ```
 
-#### 4. Server Info
+#### 7. Server Info
 
 **Endpoint:** `GET /`
 
@@ -174,13 +286,13 @@ import json
 import wave
 
 async def generate_speech():
-    uri = "ws://localhost:8001/v1/audio/speech/stream/ws"
-    
+    uri = "ws://localhost:8002/v1/audio/speech/stream/ws"
+
     async with websockets.connect(uri) as ws:
         # Send text for generation
         await ws.send(json.dumps({
             "input": "Nze Prosi Nafula. Ndi musawo akola ku bantu abalina kookolo.",
-            "voice": "luganda_female",
+            "speaker_id": "lug_female_4",
             "temperature": 0.7,
             "segment_id": "test_1"
         }))
