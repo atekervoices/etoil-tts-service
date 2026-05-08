@@ -2,11 +2,14 @@ version: '3.8'
 
 services:
   spark-tts:
-    build: 
-    container_name: spark-tts-streaming
+    image: spark-tts-streaming:latest
+    build: .
+    container_name: etoil-tts
     ports:
-      - "8000:8000"
+      - "8002:8002"
     environment:
+      - PYTHONPATH=/app
+      - GPU_MEMORY_UTILIZATION=0.25
       - CUDA_VISIBLE_DEVICES=0,1
       - MODEL_NAME=crestai/spark-tts-nexvox-v20
       - TOKENIZER_REPO=unsloth/Spark-TTS-0.5B
@@ -22,7 +25,7 @@ services:
       - NCCL_TREE_THRESHOLD=0
       - NCCL_RING_THRESHOLD=8388608
     volumes:
-      - ./src:/app/src
+      # - ./src:/app/src  # Temporarily disabled for testing
       - ./cache:/app/cache
       - ./Spark-TTS-0.5B:/app/Spark-TTS-0.5B
     shm_size: '2gb'
@@ -37,7 +40,7 @@ services:
     # runtime: nvidia
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8002/"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -134,6 +134,16 @@ docker run --gpus all -p 8002:8002 --name spark-tts spark-tts-streaming
 # Run in detached mode
 docker run -d --gpus all -p 8002:8002 --name spark-tts spark-tts-streaming
 ```
+```bash
+# 1. Build the image with v1.1 tag
+docker build -t spark-tts-streaming:v1.1 .
+
+# 2. Tag it for Docker Hub
+docker tag spark-tts-streaming:v1.1 simonallanachuka/spark-tts-streaming:v1.1
+
+# 3. Push to Docker Hub
+docker push simonallanachuka/spark-tts-streaming:v1.1
+```
 
 ## API Reference
 

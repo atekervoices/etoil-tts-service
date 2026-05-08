@@ -11,7 +11,8 @@ ENV TOKENIZER_REPO=unsloth/Spark-TTS-0.5B
 ENV TOKENIZER_CACHE_DIR=Spark-TTS-0.5B
 ENV SPARK_TTS_REPO_PATH=Spark-TTS
 ENV HOST=0.0.0.0
-ENV PORT=8000
+ENV PORT=8002
+ENV PYTHONPATH=/app
 
 # Set working directory
 WORKDIR /app
@@ -48,11 +49,11 @@ COPY src/ ./src/
 COPY main.py .
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8002
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=60s --start-period=120s --retries=3 \
+    CMD curl -f http://localhost:8002/ || exit 1
 
 # Run the application
 CMD ["python", "main.py"]
