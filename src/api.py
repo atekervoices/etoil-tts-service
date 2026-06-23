@@ -72,15 +72,45 @@ async def websocket_audio_stream(websocket: WebSocket):
 
     ping_task = None
     last_activity = time.time()
+    client_connected = True
+
+    async def safe_send_json(data: dict) -> bool:
+        """Send JSON, return False if connection is dead."""
+        nonlocal client_connected
+        if not client_connected:
+            return False
+        try:
+            await websocket.send_json(data)
+            return True
+        except Exception as e:
+            print(f"Send failed (client disconnected): {e}")
+            client_connected = False
+            return False
+
+    async def safe_send_bytes(data: bytes) -> bool:
+        """Send bytes, return False if connection is dead."""
+        nonlocal client_connected
+        if not client_connected:
+            return False
+        try:
+            await websocket.send_bytes(data)
+            return True
+        except Exception as e:
+            print(f"Send failed (client disconnected): {e}")
+            client_connected = False
+            return False
 
     async def ping_loop():
         nonlocal last_activity
-        while True:
+        while client_connected:
             try:
                 await asyncio.sleep(30)
+                if not client_connected:
+                    break
                 if time.time() - last_activity > 60:
                     print("Connection idle, sending ping")
-                    await websocket.send_json({"type": "ping"})
+                    if not await safe_send_json({"type": "ping"}):
+                        break
                     last_activity = time.time()
             except Exception:
                 break
@@ -88,7 +118,7 @@ async def websocket_audio_stream(websocket: WebSocket):
     try:
         ping_task = asyncio.create_task(ping_loop())
 
-        while True:
+        while client_connected:
             try:
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=300)
                 last_activity = time.time()
@@ -105,13 +135,15 @@ async def websocket_audio_stream(websocket: WebSocket):
                     break
 
                 if text:
-                    await websocket.send_json({
+                    if not await safe_send_json({
                         "type": "start",
                         "segment_id": segment_id,
                         "speaker_id": speaker_id
-                    })
+                    }):
+                        break
 
                     chunk_count = 0
+                    generation_error = False
                     try:
                         async_generator = generate_audio_chunks_async(
                             text=text,
@@ -120,42 +152,52 @@ async def websocket_audio_stream(websocket: WebSocket):
                         )
 
                         async for audio_chunk in async_generator:
+                            if not client_connected:
+                                print(f"Client disconnected during generation, stopping after {chunk_count} chunks")
+                                break
                             chunk_count += 1
-                            print(f"Immediately sending audio chunk {chunk_count}: {len(audio_chunk)} bytes")
-                            await websocket.send_bytes(audio_chunk)
-                            print(f"Audio chunk {chunk_count} sent and played immediately")
+                            print(f"Sending audio chunk {chunk_count}: {len(audio_chunk)} bytes")
+                            if not await safe_send_bytes(audio_chunk):
+                                print(f"Failed to send chunk {chunk_count}, client disconnected")
+                                break
+                            print(f"Audio chunk {chunk_count} sent successfully")
                             last_activity = time.time()
 
                     except Exception as e:
                         print(f"Error during audio generation: {e}")
-                        await websocket.send_json({
+                        generation_error = True
+                        await safe_send_json({
                             "type": "error",
                             "message": f"Audio generation error: {str(e)}"
                         })
-                        continue
 
-                    print(f"Finished streaming {chunk_count} audio chunks, sending end message")
-                    await websocket.send_json({
-                        "type": "end",
-                        "segment_id": segment_id
-                    })
+                    if client_connected and not generation_error:
+                        print(f"Finished streaming {chunk_count} audio chunks, sending end message")
+                        await safe_send_json({
+                            "type": "end",
+                            "segment_id": segment_id
+                        })
 
             except asyncio.TimeoutError:
                 print("Client timeout, closing connection")
                 break
             except WebSocketDisconnect:
                 print("Client disconnected")
+                client_connected = False
                 break
             except json.JSONDecodeError:
                 print("Invalid JSON received")
-                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+                await safe_send_json({"type": "error", "message": "Invalid JSON"})
             except Exception as e:
                 print(f"Error processing message: {e}")
-                await websocket.send_json({"type": "error", "message": str(e)})
+                client_connected = False
+                break
 
     except Exception as e:
         print(f"WebSocket error: {e}")
+        client_connected = False
     finally:
+        client_connected = False
         if ping_task:
             ping_task.cancel()
             try:
@@ -180,15 +222,43 @@ async def websocket_voice_cloning(websocket: WebSocket):
 
     ping_task = None
     last_activity = time.time()
+    client_connected = True
+
+    async def safe_send_json(data: dict) -> bool:
+        nonlocal client_connected
+        if not client_connected:
+            return False
+        try:
+            await websocket.send_json(data)
+            return True
+        except Exception as e:
+            print(f"Send failed (client disconnected): {e}")
+            client_connected = False
+            return False
+
+    async def safe_send_bytes(data: bytes) -> bool:
+        nonlocal client_connected
+        if not client_connected:
+            return False
+        try:
+            await websocket.send_bytes(data)
+            return True
+        except Exception as e:
+            print(f"Send failed (client disconnected): {e}")
+            client_connected = False
+            return False
 
     async def ping_loop():
         nonlocal last_activity
-        while True:
+        while client_connected:
             try:
                 await asyncio.sleep(30)
+                if not client_connected:
+                    break
                 if time.time() - last_activity > 60:
                     print("Connection idle, sending ping")
-                    await websocket.send_json({"type": "ping"})
+                    if not await safe_send_json({"type": "ping"}):
+                        break
                     last_activity = time.time()
             except Exception:
                 break
@@ -196,7 +266,7 @@ async def websocket_voice_cloning(websocket: WebSocket):
     try:
         ping_task = asyncio.create_task(ping_loop())
 
-        while True:
+        while client_connected:
             try:
                 data = await asyncio.wait_for(websocket.receive_text(), timeout=300)
                 last_activity = time.time()
@@ -213,24 +283,25 @@ async def websocket_voice_cloning(websocket: WebSocket):
                     continue
 
                 if not reference_audio_path:
-                    await websocket.send_json({
+                    await safe_send_json({
                         "type": "error",
                         "message": "reference_audio_path is required for voice cloning"
                     })
                     continue
 
                 if not os.path.exists(reference_audio_path):
-                    await websocket.send_json({
+                    await safe_send_json({
                         "type": "error",
                         "message": f"Reference audio file not found: {reference_audio_path}"
                     })
                     continue
 
-                await websocket.send_json({
+                if not await safe_send_json({
                     "type": "start",
                     "segment_id": segment_id,
                     "reference_audio": reference_audio_path
-                })
+                }):
+                    break
 
                 try:
                     loop = asyncio.get_running_loop()
@@ -246,24 +317,29 @@ async def websocket_voice_cloning(websocket: WebSocket):
                         model_loader.device
                     )
 
+                    if not client_connected:
+                        print(f"Client disconnected during voice cloning generation")
+                        break
+
                     pcm_bytes = convert_to_pcm16_bytes(result_wav)
                     print(f"Generated cloned audio: {len(result_wav)} samples, {len(pcm_bytes)} bytes")
 
                     if len(pcm_bytes) > 0:
-                        await websocket.send_bytes(pcm_bytes)
+                        if not await safe_send_bytes(pcm_bytes):
+                            break
                         print(f"Cloned audio sent for segment {segment_id}")
                     else:
                         print("Warning: Generated empty cloned audio data")
 
                 except Exception as e:
                     print(f"Error during voice cloning: {e}")
-                    await websocket.send_json({
+                    await safe_send_json({
                         "type": "error",
                         "message": f"Voice cloning error: {str(e)}"
                     })
                     continue
 
-                await websocket.send_json({
+                await safe_send_json({
                     "type": "end",
                     "segment_id": segment_id
                 })
@@ -273,17 +349,21 @@ async def websocket_voice_cloning(websocket: WebSocket):
                 break
             except WebSocketDisconnect:
                 print("Client disconnected")
+                client_connected = False
                 break
             except json.JSONDecodeError:
                 print("Invalid JSON received")
-                await websocket.send_json({"type": "error", "message": "Invalid JSON"})
+                await safe_send_json({"type": "error", "message": "Invalid JSON"})
             except Exception as e:
                 print(f"Error processing message: {e}")
-                await websocket.send_json({"type": "error", "message": str(e)})
+                client_connected = False
+                break
 
     except Exception as e:
         print(f"WebSocket error: {e}")
+        client_connected = False
     finally:
+        client_connected = False
         if ping_task:
             ping_task.cancel()
             try:
