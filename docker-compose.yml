@@ -9,7 +9,7 @@ services:
       - "8002:8002"
     environment:
       - PYTHONPATH=/app
-      - GPU_MEMORY_UTILIZATION=0.25
+      - GPU_MEMORY_UTILIZATION=0.65
       - CUDA_VISIBLE_DEVICES=0,1
       - MODEL_NAME=crestai/spark-tts-nexvox-v20
       - TOKENIZER_REPO=unsloth/Spark-TTS-0.5B

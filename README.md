@@ -135,14 +135,14 @@ docker run --gpus all -p 8002:8002 --name spark-tts spark-tts-streaming
 docker run -d --gpus all -p 8002:8002 --name spark-tts spark-tts-streaming
 ```
 ```bash
-# 1. Build the image with v1.1 tag
-docker build -t spark-tts-streaming:v1.1 .
+# 1. Build the image with v1.4 tag
+docker build -t spark-tts-streaming:v1.4 .
 
 # 2. Tag it for Docker Hub
-docker tag spark-tts-streaming:v1.1 simonallanachuka/spark-tts-streaming:v1.1
+docker tag spark-tts-streaming:v1.4 simonallanachuka/spark-tts-streaming:v1.4
 
 # 3. Push to Docker Hub
-docker push simonallanachuka/spark-tts-streaming:v1.1
+docker push simonallanachuka/spark-tts-streaming:v1.4
 ```
 
 ## API Reference

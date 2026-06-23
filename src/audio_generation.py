@@ -29,7 +29,14 @@ def text_to_speech_cloned(
         if not texts:
             raise ValueError("No valid text chunks found after processing")
 
-        sampling_params = SamplingParams(temperature=temperature, max_tokens=2048)
+        sampling_kwargs = {
+            "temperature": temperature,
+            "max_tokens": 2048,
+            "repetition_penalty": 1.05,
+        }
+        if model_loader.end_semantic_token_id is not None:
+            sampling_kwargs["stop_token_ids"] = [model_loader.end_semantic_token_id]
+        sampling_params = SamplingParams(**sampling_kwargs)
 
         print("Extracting speaker features from reference audio...")
         try:
@@ -124,18 +131,37 @@ def generate_audio_segment(text: str, speaker_id: str, temperature: float) -> np
     prompt += ''.join([f'<|bicodec_global_{t}|>' for t in global_tokens])
     prompt += '<|end_global_token|><|start_semantic_token|>'
 
-    sampling_params = SamplingParams(temperature=temperature, max_tokens=DEFAULT_MAX_TOKENS)
+    # Scale max_tokens based on text length to prevent runaway generation
+    # ~15 semantic tokens per character is a generous upper bound
+    text_based_max = max(256, min(len(text) * 15, DEFAULT_MAX_TOKENS))
+    
+    # Build sampling params with stop token if available
+    sampling_kwargs = {
+        "temperature": temperature,
+        "max_tokens": text_based_max,
+        "repetition_penalty": 1.05,  # Slight penalty to prevent token loops
+    }
+    
+    if model_loader.end_semantic_token_id is not None:
+        sampling_kwargs["stop_token_ids"] = [model_loader.end_semantic_token_id]
+    
+    sampling_params = SamplingParams(**sampling_kwargs)
     outputs = model_loader.vllm_model.generate(prompts=[prompt], sampling_params=sampling_params)
 
     predicted_tokens = outputs[0].outputs[0].text
+    finish_reason = getattr(outputs[0].outputs[0], 'finish_reason', 'unknown')
     semantic_matches = re.findall(r"<\|bicodec_semantic_(\d+)\|>", predicted_tokens)
 
     if not semantic_matches:
         raise ValueError("No semantic tokens found in the generated output.")
 
-    if len(semantic_matches) > 800:
-        semantic_matches = semantic_matches[:800]
-        print(f"Limited semantic tokens to 800 for memory safety")
+    print(f"Generated {len(semantic_matches)} semantic tokens for '{text[:40]}...' (finish_reason={finish_reason}, max_allowed={text_based_max})")
+
+    # Safety cap - should rarely trigger now with proper stop tokens
+    MAX_SEMANTIC_TOKENS = 800
+    if len(semantic_matches) > MAX_SEMANTIC_TOKENS:
+        semantic_matches = semantic_matches[:MAX_SEMANTIC_TOKENS]
+        print(f"⚠️ Limited semantic tokens to {MAX_SEMANTIC_TOKENS} for memory safety (text: '{text[:40]}...')")
 
     pred_semantic_ids = (
         torch.tensor([int(token) for token in semantic_matches]).long().unsqueeze(0)
